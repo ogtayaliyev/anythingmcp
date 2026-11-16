@@ -27,6 +27,9 @@ services:
   app:
     volumes:
       - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Médias servis sur media.vectrum.fr (publication Instagram).
+      # Lecture seule : Caddy sert, il n'écrit jamais dedans.
+      - /opt/media:/srv/media:ro
     networks:
       - default
       - amcp

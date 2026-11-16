@@ -73,3 +73,35 @@ mcp.vectrum.fr {
 	# Frontend (catch-all) : dashboard Next.js
 	reverse_proxy amcp-app:3000
 }
+
+# =============================================================================
+# media.vectrum.fr — fichiers statiques servis publiquement en HTTPS.
+#
+# Raison d'être : Instagram (comme la plupart des API sociales) ne reçoit pas
+# le fichier, il va le CHERCHER sur une URL publique. Les médias à publier
+# doivent donc être téléchargeables sans authentification.
+#
+# Le dossier /opt/media de l'hôte est monté en lecture seule sur /srv/media
+# dans le conteneur (voir compose.override.nextable.yml).
+#
+# Pas de `browse` : impossible de lister le contenu du dossier, il faut
+# connaître le nom exact du fichier.
+# =============================================================================
+media.vectrum.fr {
+	root * /srv/media
+	encode zstd gzip
+	file_server
+
+	header {
+		# Instagram télécharge une fois ; le cache évite de resservir à chaque essai.
+		Cache-Control "public, max-age=86400"
+		X-Content-Type-Options nosniff
+		-Server
+	}
+
+	# Rien d'autre que des médias n'a à être servi ici.
+	@interdit {
+		path *.php *.env *.sh *.yml *.yaml *.json
+	}
+	respond @interdit 404
+}
