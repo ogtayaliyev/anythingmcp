@@ -1,8 +1,18 @@
 # =============================================================================
 # Override Compose pour NexTable — permet à son Caddy de servir AnythingMCP.
 #
-# Destination sur le VPS : /opt/nextable/docker-compose.override.yml
-# Docker Compose le charge automatiquement en plus du docker-compose.yml.
+# Destination sur le VPS : /opt/nextable/compose.override.nextable.yml
+#
+# ⚠️ NexTable utilise docker-compose.prod.yml, pas le nom standard : Compose ne
+#    charge donc PAS d'override automatiquement. Il faut passer les deux -f :
+#
+#      cd /opt/nextable
+#      docker compose -f docker-compose.prod.yml -f compose.override.nextable.yml up -d app
+#
+#    Ne jamais ajouter --remove-orphans : les conteneurs de monitoring
+#    (grafana, prometheus, cadvisor, blackbox) appartiennent au même projet
+#    `nextable` mais sont définis dans docker-compose.monitoring.yml, donc
+#    Compose les verrait comme orphelins et les supprimerait.
 #
 # Deux changements, rien d'autre :
 #   1. monte le Caddyfile étendu (le reste de la config NexTable est inchangé)
