@@ -83,13 +83,12 @@ fi
 ssh-keyscan github.com >> "$HOME_DIR/.ssh/known_hosts" 2>/dev/null
 chown -R "$DEPLOY_USER:$DEPLOY_USER" "$HOME_DIR/.ssh"
 
-# ── 6. Firewall ──────────────────────────────────────────────────────────────
-info "Configuration du firewall"
-ufw allow 22/tcp  >/dev/null
-ufw allow 80/tcp  >/dev/null
-ufw allow 443/tcp >/dev/null
-ufw --force enable >/dev/null
-ok "Firewall actif (22, 80, 443 — les ports 3000/4000 restent internes)"
+# ── 6. Firewall (lecture seule) ──────────────────────────────────────────────
+# On ne touche PAS au firewall : la machine héberge déjà des services en
+# production. AnythingMCP n'écoute que sur 127.0.0.1 et passe par le reverse
+# proxy existant, donc aucune ouverture de port n'est nécessaire.
+info "Firewall (inspection seule, aucune modification)"
+ufw status 2>/dev/null | head -8 | sed 's/^/    /' || echo "    ufw non installé"
 
 # ── 7. Dossier applicatif ────────────────────────────────────────────────────
 install -d -o "$DEPLOY_USER" -g "$DEPLOY_USER" "$APP_DIR"
@@ -119,7 +118,19 @@ cat <<EOF
    sudo -iu $DEPLOY_USER
    git clone $REPO_SSH $APP_DIR
    cd $APP_DIR
-   ./setup.sh          # réponds "oui" au reverse proxy et donne ton domaine
+   ./setup.sh
+
+   ⚠️  COHABITATION : si un reverse proxy tourne déjà sur cette machine,
+   réponds NON au reverse proxy Caddy (il voudrait les ports 80 et 443),
+   puis fixe des ports libres dans .env :
+
+       APP_BIND_IP=127.0.0.1
+       FRONTEND_PORT=3100
+       BACKEND_PORT=4100
+       SERVER_URL=https://<ton-domaine>
+       CORS_ORIGIN=https://<ton-domaine>
+
+   et ajoute un vhost au proxy existant vers ces deux ports.
 
 EOF
 bold "═══════════════════════════════════════════════════════════════════════════"

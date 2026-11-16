@@ -5,19 +5,37 @@ jusqu'à 3 utilisateurs actifs, tous les connecteurs inclus.
 
 ---
 
-## Architecture
+## Architecture — cohabitation avec un service existant
+
+Ce VPS héberge déjà **NexTable** en production, qui occupe les ports 80 et 443.
+Le profil `proxy` d'AnythingMCP (Caddy, `80:80` + `443:443`) est donc **désactivé** :
+on réutilise le reverse proxy déjà en place.
 
 ```
-Internet ──HTTPS──► Caddy (443) ──► app:4000  (API + /mcp)
-                     │              └► frontend:3000 (dashboard)
-                     │
-                     ├── postgres  (credentials chiffrées AES-256-GCM)
-                     └── redis     (cache + rate limit)
+Internet ──HTTPS──► reverse proxy existant (80/443)
+                      ├─ nextable.tld      ──► NexTable        (inchangé)
+                      └─ mcp.tondomaine.tld ──► 127.0.0.1:3100  (dashboard)
+                                            └─► 127.0.0.1:4100  (API + /mcp)
+
+Stack AnythingMCP (réseau Docker interne, rien de publié sur l'extérieur) :
+  app · postgres · redis
 ```
 
-Un seul domaine sert tout : `https://mcp.tondomaine.com` pour le dashboard,
-`https://mcp.tondomaine.com/mcp` pour l'endpoint MCP.
-Caddy obtient le certificat Let's Encrypt automatiquement.
+Postgres et Redis ne publient aucun port sur l'hôte : aucun risque de collision
+avec les bases de NexTable. Le projet Compose s'appelle `amcp`, les conteneurs
+sont préfixés `amcp-` : pas de collision de noms non plus.
+
+| Variable `.env` | Valeur | Rôle |
+|---|---|---|
+| `APP_BIND_IP` | `127.0.0.1` | rien n'est exposé publiquement |
+| `FRONTEND_PORT` | `3100` | dashboard, derrière le proxy |
+| `BACKEND_PORT` | `4100` | API + `/mcp`, derrière le proxy |
+| `COMPOSE_PROFILES` | *(vide)* | **ne pas** mettre `proxy` |
+| `SERVER_URL` | `https://mcp.tondomaine.tld` | redirections OAuth2 |
+| `CORS_ORIGIN` | `https://mcp.tondomaine.tld` | appels du dashboard |
+
+> ⚠️ `SERVER_URL` doit être l'URL **publique** en HTTPS, pas `localhost` :
+> sinon le flux OAuth2 des clients MCP redirige dans le vide.
 
 ---
 
@@ -37,16 +55,27 @@ Le DNS doit pointer **avant** de lancer `setup.sh`, sinon Let's Encrypt échoue.
 
 ---
 
-## 2. Bootstrap du VPS (une fois)
+## 2. Préflight (lecture seule)
+
+À lancer en premier sur une machine qui a déjà des services en production :
 
 ```bash
-ssh root@<IP_DU_VPS>
+curl -fsSL https://raw.githubusercontent.com/ogtayaliyev/anythingmcp/main/vps/preflight.sh | bash
+```
+
+Ne modifie rien. Inventorie Docker, les conteneurs en cours, les ports occupés,
+le reverse proxy en place et les ports candidats libres.
+
+## 3. Bootstrap du VPS (une fois)
+
+```bash
 curl -fsSL https://raw.githubusercontent.com/ogtayaliyev/anythingmcp/main/vps/bootstrap.sh -o bootstrap.sh
 sudo bash bootstrap.sh
 ```
 
-Le script installe Docker, crée l'utilisateur `deploy`, génère les deux clés SSH,
-configure le firewall, puis affiche les clés à coller dans GitHub.
+Installe Docker (s'il manque), crée l'utilisateur `deploy`, génère les deux clés
+SSH, puis affiche les clés à coller dans GitHub.
+**Ne touche pas au firewall** ni aux services existants.
 
 ---
 
