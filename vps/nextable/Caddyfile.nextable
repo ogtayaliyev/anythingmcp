@@ -1,0 +1,75 @@
+# =============================================================================
+# Caddyfile NexTable + AnythingMCP
+#
+# Copie conforme du Caddyfile embarqué dans l'image NexTable (FrankenPHP),
+# AVEC un bloc supplémentaire pour mcp.vectrum.fr.
+#
+# Destination sur le VPS : /opt/nextable/caddy/Caddyfile
+# Monté en lecture seule via /opt/nextable/docker-compose.override.yml
+#
+# ⚠️ Si l'image NexTable change son Caddyfile lors d'une mise à jour, ce fichier
+#    monté prendra le dessus. Comparer après chaque montée de version :
+#      docker run --rm --entrypoint cat <image_nextable> /etc/caddy/Caddyfile
+# =============================================================================
+
+{
+	email {$ACME_EMAIL}
+	admin off
+}
+
+# SERVER_NAME must use spaces after commas, e.g. "nextable.fr, www.nextable.fr"
+{$SERVER_NAME} {
+	root * /app/public
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	request_body {
+		max_size 12MB
+	}
+
+	php_server
+}
+
+# Docker healthcheck / local probes (no TLS, no ACME).
+http://127.0.0.1, http://localhost {
+	root * /app/public
+	encode zstd gzip
+	php_server
+}
+
+# =============================================================================
+# AnythingMCP — ajouté, ne touche pas aux blocs NexTable ci-dessus.
+# Certificat Let's Encrypt automatique (email du bloc global).
+# amcp-app est joignable car ce conteneur est attaché au réseau amcp_default.
+# =============================================================================
+mcp.vectrum.fr {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Backend : API, MCP, OAuth2, health
+	reverse_proxy /api/*          amcp-app:4000
+	reverse_proxy /mcp/*          amcp-app:4000
+	reverse_proxy /health/*       amcp-app:4000
+	reverse_proxy /.well-known/*  amcp-app:4000
+	reverse_proxy /authorize      amcp-app:4000
+	reverse_proxy /token          amcp-app:4000
+	reverse_proxy /register       amcp-app:4000
+	reverse_proxy /callback       amcp-app:4000
+	reverse_proxy /revoke         amcp-app:4000
+	reverse_proxy /auth/*         amcp-app:4000
+
+	# Frontend (catch-all) : dashboard Next.js
+	reverse_proxy amcp-app:3000
+}

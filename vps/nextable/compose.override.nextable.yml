@@ -1,0 +1,27 @@
+# =============================================================================
+# Override Compose pour NexTable — permet à son Caddy de servir AnythingMCP.
+#
+# Destination sur le VPS : /opt/nextable/docker-compose.override.yml
+# Docker Compose le charge automatiquement en plus du docker-compose.yml.
+#
+# Deux changements, rien d'autre :
+#   1. monte le Caddyfile étendu (le reste de la config NexTable est inchangé)
+#   2. attache le conteneur au réseau d'AnythingMCP, pour que Caddy puisse
+#      joindre amcp-app sans publier le moindre port supplémentaire
+#
+# ⚠️ Le réseau amcp_default doit exister AVANT d'appliquer cet override :
+#    démarrer AnythingMCP en premier.
+# =============================================================================
+
+services:
+  app:
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - default
+      - amcp
+
+networks:
+  amcp:
+    external: true
+    name: amcp_default
