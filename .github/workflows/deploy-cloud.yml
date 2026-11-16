@@ -35,7 +35,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Plain OpenSSH from the runner. Until 2026-11-08 the two steps below
       # were appleboy/scp-action and appleboy/ssh-action, which download their
